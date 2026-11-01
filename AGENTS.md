@@ -27,7 +27,8 @@ docs/     progress.md, decisions.md, learning-log.md
 - Ask before running destructive commands (rm -rf, git reset --hard, force
   push) or anything with sudo or global installs.
 - Never invent credentials, hostnames, IPs, or URLs. Use placeholders
-  like `<DOCKERHUB_USER>` and read secrets from env vars or Jenkins credentials.
+  like `<SERVER_IP>` or `<DOCKERHUB_TOKEN>` and read secrets from env vars
+  or Jenkins credentials.
 - Never put secrets in any file, including examples. Provide `.env.example` only.
 - Prefer simple, commonly used patterns over clever ones. Add short comments
   explaining WHY for non-obvious DevOps choices (I need to explain them in
@@ -38,11 +39,11 @@ docs/     progress.md, decisions.md, learning-log.md
   them in your summary.
 
 ## Conventions
-- Node <NODE_MAJOR> (same major in Dockerfile, CI, and package.json "engines"),
+- Node 26 (same major in Dockerfile, CI, and package.json "engines"),
   npm (use `npm ci` in CI), TypeScript.
 - Docker: multi-stage, non-root user, small base image, HEALTHCHECK.
 - Commits: conventional style (feat:, fix:, docs:, chore:).
-- Image name: `<DOCKERHUB_USER>/devops-pipeline-demo`.
+- Image name: `funkyd3v/devops-pipeline-demo`.
 
 ## Definition of done (every stage)
 - Commands run successfully and output is shown.
