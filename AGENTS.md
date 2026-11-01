@@ -8,28 +8,38 @@ Portfolio project: take a small NestJS REST API through a full DevOps workflow
 pipeline and infrastructure are the point.
 
 ## Layout
+```
 app/      NestJS source
 docker/   Dockerfile extras, compose files
 jenkins/  Jenkinsfile
 ansible/  playbooks, inventory, roles
 k8s/      manifests
 docs/     progress.md, decisions.md, learning-log.md
+```
 
 ## Working rules
 - Work on ONE roadmap stage at a time. Do not touch other stages.
 - Read docs/progress.md before starting. Update it when finished.
-- Only modify files inside the folder for the current stage, unless told otherwise.
+- Only modify files inside the folder for the current stage, plus README.md
+  (roadmap checkbox) and docs/progress.md, unless told otherwise.
 - Never commit or push. Show `git status` and `git diff --stat` and stop.
+- Propose a short plan and wait for approval before writing files.
+- Ask before running destructive commands (rm -rf, git reset --hard, force
+  push) or anything with sudo or global installs.
 - Never invent credentials, hostnames, IPs, or URLs. Use placeholders
   like `<DOCKERHUB_USER>` and read secrets from env vars or Jenkins credentials.
 - Never put secrets in any file, including examples. Provide `.env.example` only.
 - Prefer simple, commonly used patterns over clever ones. Add short comments
-  explaining WHY for non-obvious DevOps choices (I need to explain them in interviews).
+  explaining WHY for non-obvious DevOps choices (I need to explain them in
+  interviews).
 - Pin versions (base images, Node, action/plugin versions). No `latest` tags.
-- Do not add tools or dependencies that are not in the roadmap.
+- Do not add tools or services that are not in the roadmap. Minimal app
+  dependencies needed for the current stage's requirements are fine; list
+  them in your summary.
 
 ## Conventions
-- Node 20, npm (use `npm ci` in CI), TypeScript.
+- Node <NODE_MAJOR> (same major in Dockerfile, CI, and package.json "engines"),
+  npm (use `npm ci` in CI), TypeScript.
 - Docker: multi-stage, non-root user, small base image, HEALTHCHECK.
 - Commits: conventional style (feat:, fix:, docs:, chore:).
 - Image name: `<DOCKERHUB_USER>/devops-pipeline-demo`.
