@@ -44,7 +44,7 @@ Ansible                Kubernetes
 
 ## Roadmap
 
-- [ ] NestJS REST API (`/health`, `/items`) with unit tests
+- [x] NestJS REST API (`/health`, `/items`) with unit tests
 - [ ] Dockerfile (multi-stage) and docker-compose
 - [ ] Jenkins pipeline (build, test, push image)
 - [ ] Ansible playbook (provision VM + deploy app)
