@@ -31,6 +31,29 @@ COPY package.json package-lock.json ./
 # in the runtime stage.
 RUN npm ci --omit=dev
 
+# The test stage sits BEFORE runtime on purpose: Docker builds the LAST stage in
+# the file by default, so keeping runtime last means a plain "docker build" still
+# produces the app image, while CI can opt in with --target test. Tests run
+# inside the image (same Node tag, same lockfile) so the Jenkins agent needs no
+# Node, npm or Jest installed.
+FROM node:26.13.0-alpine AS test
+WORKDIR /app
+# Reuse the modules already installed in deps instead of running npm ci again:
+# tests must run against exactly the locked dependency tree that ships, and the
+# install is the slowest layer to repeat.
+COPY --from=deps /app/node_modules ./node_modules
+# package.json carries the test scripts and the inline Jest config; the e2e
+# suite is configured separately by test/jest-e2e.json.
+COPY package.json package-lock.json ./
+# tsconfig*.json and nest-cli.json are read by ts-jest (unit) and by the e2e
+# bootstrap, so both are required even though nothing is compiled here.
+COPY nest-cli.json tsconfig.json tsconfig.build.json ./
+COPY src ./src
+COPY test ./test
+# Unit and e2e suites both run in this single layer; a failure fails the build,
+# which is what the Jenkins "Test" stage relies on.
+RUN npm test && npm run test:e2e
+
 FROM node:26.13.0-alpine AS runtime
 WORKDIR /app
 # NODE_ENV=production makes Nest and npm skip development-only paths; PORT is

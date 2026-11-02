@@ -1,13 +1,93 @@
-// Placeholder: proves Jenkins can check out the repo. Replaced by the real pipeline.
+// CI pipeline: test -> build image -> push to Docker Hub.
+// Plain docker CLI on purpose (no docker-workflow plugin): the agent has the
+// Docker CLI plus the host socket mounted (see jenkins/), and plain commands are
+// easy to reproduce by hand in a terminal or in an interview.
 pipeline {
     agent any
+
+    options {
+        // Wall-clock timestamps on every line: makes a slow stage obvious.
+        timestamps()
+        // One shared host Docker daemon + build-number tags: parallel builds of
+        // the same job would fight over tags and disk space.
+        disableConcurrentBuilds()
+        // Hard cap so a hung pull/login/push cannot occupy the executor forever.
+        timeout(time: 15, unit: 'MINUTES')
+        // The explicit "Checkout" stage is the only checkout. This also means
+        // nothing is checked out before the stage runs.
+        skipDefaultCheckout(true)
+    }
+
+    environment {
+        // Repository name without a tag; the tag is computed per build below.
+        IMAGE_REPO = 'funkyd3v/devops-pipeline-demo'
+    }
+
     stages {
-        stage('Checkout check') {
+        stage('Checkout') {
             steps {
-                // Jenkins has already checked out the repo into the workspace
-                sh 'ls -la'
-                sh 'git log --oneline -3'
+                checkout scm
+                script {
+                    // Build-number + short SHA is unique and traceable back to the
+                    // commit. .trim() removes the trailing newline git prints.
+                    // "latest" is deliberately never used: a moving tag makes a
+                    // deployed version impossible to identify.
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sh(
+                        returnStdout: true,
+                        script: 'git rev-parse --short HEAD'
+                    ).trim()}"
+                }
             }
+        }
+
+        stage('Test') {
+            steps {
+                // Tests run during the image build, so they use the same pinned
+                // Node tag and lockfile as the image that ships. A non-zero exit
+                // from npm test fails the build and stops the pipeline here.
+                // The build context is app/ (Dockerfile lives there); output is
+                // kept in the log so a failing test line is readable in Jenkins.
+                sh 'docker build --target test app'
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                // No --target: runtime is the last stage, so it is the default.
+                sh 'docker build -t "$IMAGE_REPO:$IMAGE_TAG" app'
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                // Credentials are injected as shell environment variables and are
+                // only ever referenced inside single-quoted sh strings, so Groovy
+                // never interpolates (and never logs) the secret.
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKERHUB_USER',
+                    passwordVariable: 'DOCKERHUB_TOKEN'
+                )]) {
+                    // printf instead of echo: no trailing newline surprises, and
+                    // --password-stdin keeps the token out of the process list.
+                    sh 'printf \'%s\' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin'
+                    sh 'docker push "$IMAGE_REPO:$IMAGE_TAG"'
+                    // Log out immediately; the token must not stay in the Docker
+                    // CLI config on the agent after the push.
+                    sh 'docker logout'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Cleanup must not mask the real failure, hence "|| true" on both.
+            sh 'docker logout || true'
+            // Remove the local tag built by this run so the shared host Docker
+            // disk does not fill up with one image per build number. Guarded
+            // because IMAGE_TAG is unset if checkout failed.
+            sh 'if [ -n "$IMAGE_TAG" ]; then docker rmi "$IMAGE_REPO:$IMAGE_TAG" || true; fi'
         }
     }
 }
