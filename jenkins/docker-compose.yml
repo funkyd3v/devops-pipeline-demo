@@ -1,0 +1,29 @@
+# Local learning setup only. Mounting the Docker socket gives Jenkins control of
+# the host's Docker engine - anything that can run a build can start privileged
+# containers, i.e. effectively root on this machine. Acceptable for a throwaway
+# WSL2/Docker Desktop lab; a real setup would use an isolated/rootless agent.
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Explicit tag (never latest) so a local image is traceable to a version.
+    image: devops-pipeline-demo/jenkins:1.0.0
+    ports:
+      # UI only. No 50000: the pipeline runs on the controller, there are no agents.
+      - "8080:8080"
+    volumes:
+      # Named volume so jobs/config survive `compose down`.
+      - jenkins_home:/var/jenkins_home
+      # Reuse the Docker Desktop engine: same cache/images as local `docker` commands.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # 989 is the GID of /var/run/docker.sock as seen from inside the container
+    # (checked with `stat -c '%g'` on the mounted socket). It lets the non-root
+    # jenkins user talk to the socket. It may differ on other machines - re-read
+    # it there if Jenkins gets "permission denied".
+    group_add:
+      - "989"
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

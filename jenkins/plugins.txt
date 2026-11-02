@@ -1,0 +1,6 @@
+# Pipeline plugins, all pinned as name:version. Bump deliberately, not with "latest".
+# workflow-aggregator brings in the Pipeline stack; the rest are used by the Jenkinsfile.
+workflow-aggregator:608.v67378e9d3db_1
+git:5.11.0
+credentials-binding:728.v902a_273b_8947
+docker-workflow:653.v2f2c08eff0ec
