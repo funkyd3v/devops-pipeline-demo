@@ -1,25 +1,13 @@
-// CI pipeline: test -> build image -> push to Docker Hub.
-// Plain docker CLI on purpose (no docker-workflow plugin): the agent has the
-// Docker CLI plus the host socket mounted (see jenkins/), and plain commands are
-// easy to reproduce by hand in a terminal or in an interview.
 pipeline {
     agent any
 
     options {
-        // Wall-clock timestamps on every line: makes a slow stage obvious.
-        timestamps()
-        // One shared host Docker daemon + build-number tags: parallel builds of
-        // the same job would fight over tags and disk space.
         disableConcurrentBuilds()
-        // Hard cap so a hung pull/login/push cannot occupy the executor forever.
         timeout(time: 15, unit: 'MINUTES')
-        // The explicit "Checkout" stage is the only checkout. This also means
-        // nothing is checked out before the stage runs.
         skipDefaultCheckout(true)
     }
 
     environment {
-        // Repository name without a tag; the tag is computed per build below.
         IMAGE_REPO = 'funkyd3v/devops-pipeline-demo'
     }
 
