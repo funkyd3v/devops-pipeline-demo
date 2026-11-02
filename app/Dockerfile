@@ -54,8 +54,9 @@ EXPOSE 3000
 #                     "hung", not "slow".
 # --start-period=10s  grace window for Nest to boot; early failures during
 #                     startup are not counted.
-# --retries=3         three consecutive failures (~90s) before unhealthy, so a
-#                     single transient hiccup does not trigger a restart.
+# --retries=3         three consecutive failures (~90s) before the container is
+#                     marked unhealthy, so one transient hiccup is ignored.
+#                     (Plain Docker only reports status; it does not restart.)
 # busybox wget is already in Alpine, so the probe adds no packages.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
