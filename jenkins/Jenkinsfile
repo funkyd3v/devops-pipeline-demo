@@ -28,14 +28,8 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    // Build-number + short SHA is unique and traceable back to the
-                    // commit. .trim() removes the trailing newline git prints.
-                    // "latest" is deliberately never used: a moving tag makes a
-                    // deployed version impossible to identify.
-                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sh(
-                        returnStdout: true,
-                        script: 'git rev-parse --short HEAD'
-                    ).trim()}"
+                    def sha = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sha}"
                 }
             }
         }
