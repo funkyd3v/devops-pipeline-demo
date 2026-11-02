@@ -4,7 +4,7 @@ Agents: read this at the start of each session and update it at the end of each 
 
 ## Current stage
 
-Stage 3: Jenkins pipeline (build, test, push image) - not started.
+Stage 4: Ansible playbook (provision VM + deploy app) - not started.
 
 ## Completed
 
@@ -32,16 +32,26 @@ Stage 3: Jenkins pipeline (build, test, push image) - not started.
     empty name 400, `compose down` clean
   - Fixed during build: build stage was missing `package.json`, so
     `npm run build` had no script
+- Stage 3: Jenkins pipeline
+  - Jenkins runs in a container (jenkins/Dockerfile, plugins.txt, docker-compose.yml),
+    pinned LTS 2.580.2-lts-jdk21, Docker CLI only, host socket mounted via group_add
+  - Four plugins pinned: workflow-aggregator, git, credentials-binding, docker-workflow
+  - Credential `dockerhub-creds` stored in the Jenkins credentials store (never in the repo)
+  - jenkins/Jenkinsfile: Checkout -> Test -> Build Image -> Push Image, with cleanup in post
+  - Tests run inside the image build via a `test` stage in app/Dockerfile
+  - Tag format <BUILD_NUMBER>-<short sha>; build #4 pushed funkyd3v/devops-pipeline-demo:4-be6bc1a
+  - Verified: image pulled from Docker Hub and /health returned {"status":"ok"}
+  - Fixed during build: nested sh() in a multi-line Groovy string (syntax error);
+    timestamps() option rejected because the Timestamper plugin is not installed
 
 ## Next
 
-- Stage 3: Jenkins pipeline
-  - Run Jenkins in a container on WSL2 with Docker access
-  - Jenkinsfile: checkout -> install -> test -> build image -> push to Docker Hub
-  - Docker Hub credentials from the Jenkins credentials store, never committed
-  - Reuse the same pinned Node 26 tag so CI and local builds match
+- Stage 4: Ansible
+  - Inventory and a playbook that installs Docker and deploys the image on a target VM
+  - Kubernetes follows after Ansible
 
 ## Known issues
 
-- None open. `dist/` and `node_modules/` are gitignored.
-- Image tag `0.1.0` is set by hand; Stage 3 will switch to build-number tags.
+- Jenkins job is triggered manually (no webhook)
+- group_add GID 989 is machine-specific
+- Docker Pipeline plugin is flagged "up for adoption"

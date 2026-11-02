@@ -46,7 +46,7 @@ Ansible                Kubernetes
 
 - [x] NestJS REST API (`/health`, `/items`) with unit tests
 - [x] Dockerfile (multi-stage) and docker-compose
-- [ ] Jenkins pipeline (build, test, push image)
+- [x] Jenkins pipeline (build, test, push image)
 - [ ] Ansible playbook (provision VM + deploy app)
 - [ ] Kubernetes manifests (Deployment, Service, ConfigMap/Secret, probes)
 - [ ] Rolling update and rollback demo
