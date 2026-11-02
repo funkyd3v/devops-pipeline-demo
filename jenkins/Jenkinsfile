@@ -1,0 +1,13 @@
+// Placeholder: proves Jenkins can check out the repo. Replaced by the real pipeline.
+pipeline {
+    agent any
+    stages {
+        stage('Checkout check') {
+            steps {
+                // Jenkins has already checked out the repo into the workspace
+                sh 'ls -la'
+                sh 'git log --oneline -3'
+            }
+        }
+    }
+}
