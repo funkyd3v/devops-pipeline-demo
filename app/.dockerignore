@@ -1,0 +1,10 @@
+# Keep the build context small and make sure local artifacts and secrets can
+# never end up in an image layer.
+node_modules
+dist
+coverage
+.git
+*.log
+.env
+Dockerfile
+.dockerignore

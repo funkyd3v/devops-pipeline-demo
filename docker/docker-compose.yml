@@ -1,0 +1,15 @@
+# Compose v2 file: the top-level "version" key is obsolete and only warns.
+services:
+  api:
+    build:
+      context: ../app
+    # Explicit tag, never "latest", so every run deploys a known build.
+    image: funkyd3v/devops-pipeline-demo:0.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      # Same contract as src/main.ts; the Dockerfile default is also 3000.
+      PORT: "3000"
+    # Restart on crashes and after a Docker daemon restart, but stay down when
+    # the developer intentionally stops it.
+    restart: unless-stopped
