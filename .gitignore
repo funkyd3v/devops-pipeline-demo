@@ -10,3 +10,8 @@ coverage/
 
 # Logs
 *.log
+
+# Ansible: the real inventory holds machine-specific host details, and known_hosts
+# is local state. Both are created from committed templates/examples.
+ansible/inventory.ini
+ansible/known_hosts

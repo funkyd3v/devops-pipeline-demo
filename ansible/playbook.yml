@@ -1,0 +1,81 @@
+---
+# Provisions the "server" and deploys the image Jenkins pushed in Stage 3.
+#
+# The target is a local container (target/docker-compose.yml) standing in for a
+# VM. It has no Docker daemon of its own: /var/run/docker.sock inside it is the
+# HOST's socket, so the app container below is created on the host engine, not
+# inside the target. That is also why the Docker tasks run as root (become): the
+# socket is owned by root, so its machine-specific GID never has to be hardcoded
+# and the deploy user never needs a docker group.
+- name: Provision the server and deploy the app
+  hosts: all
+  become: true
+
+  vars:
+    app_image: funkyd3v/devops-pipeline-demo
+    app_tag: "4-be6bc1a"        # Stage 3 output: Jenkins build #4, short sha
+    app_container: demo-api
+    app_host_port: 3002
+
+    # The Ubuntu archive only ships docker.io (CLI + dockerd). Docker's own repo
+    # has docker-ce-cli, which is the CLI alone - and no daemon we would never
+    # start. Pinned like every other version in this repo; bump it deliberately.
+    docker_cli_version: "5:29.9.2-1~ubuntu.24.04~noble"
+
+  tasks:
+    - name: Install Docker's apt repository signing key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /usr/share/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker's apt repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}
+          signed-by=/usr/share/keyrings/docker.asc]
+          https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        filename: docker
+        state: present
+
+    - name: Install the Docker CLI and the Python Docker SDK
+      # docker-ce-cli: client only, no dockerd in this image.
+      # python3-docker: the docker SDK that community.docker modules import on
+      # the target. install_recommends: false keeps the unused buildx/compose
+      # plugins out.
+      ansible.builtin.apt:
+        name:
+          - "docker-ce-cli={{ docker_cli_version }}"
+          - python3-docker
+        state: present
+        update_cache: true
+        cache_valid_time: 3600    # keeps a repeat run within the hour at changed=0
+        install_recommends: false
+
+    - name: Create the deploy user
+      # Non-root and deliberately without sudo or any supplementary group - in
+      # particular not the docker group. Deployment happens through become.
+      ansible.builtin.user:
+        name: deploy
+        shell: /bin/bash
+        create_home: true
+        groups: []
+
+    - name: Pull the pinned app image
+      # Pulls only when the image is missing locally, so a repeat run is a no-op
+      # (changed=0) instead of always hitting the registry.
+      community.docker.docker_image:
+        name: "{{ app_image }}"
+        tag: "{{ app_tag }}"
+        source: pull
+        state: present
+
+    - name: Run the app container
+      # Declarative: recreates only when the image or this config changes.
+      community.docker.docker_container:
+        name: "{{ app_container }}"
+        image: "{{ app_image }}:{{ app_tag }}"
+        ports:
+          - "127.0.0.1:{{ app_host_port }}:3000"
+        restart_policy: unless-stopped
+        state: started

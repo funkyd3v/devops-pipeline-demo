@@ -1,0 +1,36 @@
+# Local stand-in for a real server: an SSH-able Ubuntu "VM" whose only job is to
+# run commands for Ansible (and carry a Docker CLI).
+#
+# The app container the playbook deploys does NOT run inside this container. The
+# playbook talks to /var/run/docker.sock, which is the HOST's socket, so the app
+# container is created on the host Docker engine (same trade-off as the Jenkins
+# container in Stage 3: anything that can reach this socket has root-equivalent
+# control of the host engine - acceptable for a throwaway local lab, a real
+# server would use a rootless or SSH Docker context instead).
+name: ansible-target
+
+services:
+  target:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Explicit tag, never latest, so a local image is traceable to a version.
+    image: devops-pipeline-demo/target:1.0.0
+    ports:
+      # Loopback only: this box is a lab. 2222 -> sshd in this container.
+      - "127.0.0.1:2222:22"
+    volumes:
+      # Public key only. The matching private key stays in ~/.ssh on WSL2 and is
+      # never copied into the image or the repo.
+      - ~/.ssh/devops_demo.pub:/run/keys/devops_demo.pub:ro
+      # Host keys outlive the container, so rebuilding does not invalidate
+      # ansible/known_hosts (clients would see a changed host key).
+      - host_keys:/etc/ssh/host_keys
+      # The HOST's Docker engine. No group_add here: the socket is owned by root
+      # and the playbook talks to it as root (become), so the socket's
+      # machine-specific GID (989 here, see Stage 3) never has to be hardcoded.
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  host_keys:
