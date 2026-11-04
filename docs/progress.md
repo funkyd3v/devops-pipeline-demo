@@ -4,7 +4,7 @@ Agents: read this at the start of each session and update it at the end of each 
 
 ## Current stage
 
-Stage 5: Kubernetes manifests (Deployment, Service, ConfigMap/Secret, probes) - not started.
+Stage 6: Monitoring with Prometheus and Grafana (optional) - not started.
 
 ## Completed
 
@@ -71,12 +71,52 @@ Stage 5: Kubernetes manifests (Deployment, Service, ConfigMap/Secret, probes) - 
     only sshd); host key fingerprint identical after `compose restart target`
   - Fixed during stage: Ansible split `ansible_ssh_common_args` at the space in
     the INI inventory, so the value is quoted
+- Stage 5: Kubernetes on a local kind cluster
+  - `k8s/kind-config.yaml`: one control-plane node; the cluster name is passed on
+    the CLI (`kind create cluster --name devops-demo`) because kind's config
+    schema has no name field
+  - Node image pinned by digest: `kindest/node:v1.37.0` with digest
+    `sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5`
+    (kind re-pushes tags, so only a digest guarantees the build)
+  - Tooling installed per-user, checksum-verified: kind v0.33.0 and kubectl
+    v1.37.0 in `~/.local/bin`; the pre-existing global kubectl v1.34.1 is left
+    untouched (it is three minors behind the 1.37 API)
+  - `k8s/deployment.yaml`: 2 replicas, image
+    `funkyd3v/devops-pipeline-demo:4-be6bc1a`, `imagePullPolicy: IfNotPresent`
+    (safe because every build tag is unique), requests 50m/64Mi, limits
+    250m/256Mi, readiness and liveness probes on `/health`, RollingUpdate with
+    `maxUnavailable: 0` and `maxSurge: 1`, `revisionHistoryLimit: 5`
+  - Security: pod runs as uid/gid 1000 with `runAsNonRoot`,
+    `readOnlyRootFilesystem: true`, all capabilities dropped,
+    `seccompProfile: RuntimeDefault`, writable `/tmp` from an emptyDir
+  - `k8s/service.yaml`: ClusterIP, port 80 to the named `http` port;
+    `k8s/configmap.yaml`: `PORT=3000`
+  - No Secret: the app has no database, tokens or credentials, and the Docker Hub
+    repository is public, so no Secret was invented (explained in `k8s/README.md`)
+  - `k8s/README.md`: pinned install with checksum verification, deploy, verify,
+    port-forward, rolling update, rollback, failed rollout, disk usage, teardown
+  - Verified: node Ready in 18s; 2/2 pods Ready with 0 restarts; `id` inside the
+    container is uid 1000; a write to the image filesystem is denied while the
+    emptyDir `/tmp` is writable; `kubectl port-forward` to the Service returned
+    `{"status":"ok"}`; `POST /items` 201 then `GET /items` 200; empty `name` 400
+  - Zero-downtime: 80 requests at 1/s from a pod inside the cluster (against the
+    Service DNS) during the 4-be6bc1a -> 5-28f8fc8 rollout: 80 OK, 0 failed
+  - Update: new ReplicaSet created, old scaled to 0; rollout history 1,2
+  - Rollback: image back to 4-be6bc1a; history 2,3 because the previous
+    ReplicaSet is reused and renumbered (revision 1 disappears)
+  - Failed rollout with tag `999-deadbee`: `rollout status` timed out after 60s,
+    new pod went ErrImagePull -> ImagePullBackOff, both old pods kept serving
+    (`/health` 200); `rollout undo` restored 4-be6bc1a, history 2,4,5
+  - Disk: Docker images grew 6.06 -> 7.41 GB and volumes 0.93 -> 2.36 GB; the
+    Windows C: drive stayed above 25 GB free (stop line is 10 GB). The kind
+    control plane used 1.28 GiB of the Docker VM's 3.78 GiB
+  - Cluster is left running; teardown is manual with
+    `kind delete cluster --name devops-demo`
 
 ## Next
 
-- Stage 5: Kubernetes
-  - Deployment, Service, ConfigMap/Secret and probes for the same image
-  - Then the rolling update / rollback demo
+- Stage 6: Monitoring with Prometheus and Grafana (optional), not started
+- The kind cluster from Stage 5 is still running until teardown is decided
 
 ## Known issues
 
@@ -88,3 +128,14 @@ Stage 5: Kubernetes manifests (Deployment, Service, ConfigMap/Secret, probes) - 
   engine thanks to API negotiation, but it is an old SDK
 - If the `host_keys` volume is removed (`compose down -v`), the target gets new
   host keys and `ansible/known_hosts` must be deleted before the next run
+- The user-local kubectl v1.37.0 must stay first in `PATH`; the global v1.34.1 is
+  too old for the 1.37 API and would speak an unsupported version
+- `kubectl rollout undo` warns that `last-applied-configuration` is stale; the
+  next `kubectl apply -f k8s/deployment.yaml` reconciles it (the file already
+  matches the running image)
+- `kubectl get endpoints` is deprecated in v1.37; EndpointSlice is the supported
+  API, but the warning is cosmetic
+- The kind cluster from Stage 5 is still running and holds roughly 2.4 GB of
+  Docker volumes; `kind delete cluster --name devops-demo` frees the container
+  but leaves the node image cached
+

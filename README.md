@@ -48,8 +48,8 @@ Ansible                Kubernetes
 - [x] Dockerfile (multi-stage) and docker-compose
 - [x] Jenkins pipeline (build, test, push image)
 - [x] Ansible playbook (provision VM + deploy app)
-- [ ] Kubernetes manifests (Deployment, Service, ConfigMap/Secret, probes)
-- [ ] Rolling update and rollback demo
+- [x] Kubernetes manifests (Deployment, Service, ConfigMap/Secret, probes)
+- [x] Rolling update and rollback demo
 - [ ] Monitoring with Prometheus and Grafana (optional)
 - [ ] Cloud deployment on AWS free tier (optional)
 
