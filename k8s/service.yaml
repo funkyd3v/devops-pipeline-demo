@@ -1,0 +1,27 @@
+# Stable virtual IP in front of the Deployment's pods.
+#
+# Why ClusterIP: the pods get and lose IPs on every rollout, so nothing should
+# talk to a pod IP directly. A ClusterIP gives one DNS name
+# (devops-pipeline-demo) that always resolves to the ready pods. It is
+# cluster-internal, so the demo reaches it with `kubectl port-forward`, which
+# needs no NodePort and no cloud load balancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-pipeline-demo
+  labels:
+    app: devops-pipeline-demo
+spec:
+  type: ClusterIP
+  selector:
+    # This label is the only wiring between the Service and the pods: any pod
+    # carrying it and passing its readiness probe receives traffic.
+    app: devops-pipeline-demo
+  ports:
+    - name: http
+      # Port the Service listens on inside the cluster.
+      port: 80
+      # Named container port, so the Service follows the pod if the app's port
+      # changes in one place (deployment.yaml) instead of two.
+      targetPort: http
+      protocol: TCP

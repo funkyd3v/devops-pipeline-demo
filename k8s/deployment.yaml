@@ -1,0 +1,125 @@
+# Deployment for the API image built by Jenkins build #4.
+#
+# Why a Deployment instead of a bare Pod: the Deployment owns a ReplicaSet,
+# which gives self-healing (a deleted pod is recreated) and, more importantly,
+# the rolling update and rollback behaviour this stage demonstrates. Each image
+# change creates a new ReplicaSet and the previous one is kept, which is what
+# `kubectl rollout undo` rolls back to.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-pipeline-demo
+  labels:
+    app: devops-pipeline-demo
+spec:
+  replicas: 2
+  # Two pods mean one can be replaced while the other keeps serving. With one
+  # replica a maxUnavailable: 0 rollout could never make progress.
+  #
+  # Keep the last 5 ReplicaSets: enough to undo a few bad releases, few enough
+  # that old pod specs do not pile up (disk is tight on this machine).
+  revisionHistoryLimit: 5
+  selector:
+    # Immutable after creation. It must match the pod labels below; this is how
+    # the Deployment recognises the pods it owns.
+    matchLabels:
+      app: devops-pipeline-demo
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # The key safety property: a healthy pod is only removed AFTER its
+      # replacement passes its readiness probe. If a new pod never becomes
+      # ready (bad image, broken probe), the old pods keep serving and the
+      # rollout stalls instead of taking the service down.
+      maxUnavailable: 0
+      # One replacement at a time. The cluster has a single node, so a bigger
+      # surge would only queue up and add memory pressure, not speed.
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: devops-pipeline-demo
+    spec:
+      securityContext:
+        # The image already ends with `USER node` (uid 1000). Repeating it at
+        # the pod level makes Kubernetes enforce it: if the image ever regressed
+        # to root, the pod would be rejected instead of running privileged.
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        # RuntimeDefault blocks the syscalls a container does not normally
+        # need, at no cost to a plain Node app.
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          # Pinned to a Jenkins build tag (build number + short sha), never
+          # "latest": the running version is always identifiable and rollbacks
+          # target an exact, immutable build.
+          image: funkyd3v/devops-pipeline-demo:4-be6bc1a
+          # Safe precisely BECAUSE the tag is unique per build: a cached image
+          # can never be the wrong one, and pod restarts do not hit the registry
+          # again. With a mutable tag this would have to be Always.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          envFrom:
+            # Injects PORT from the ConfigMap as a plain environment variable.
+            # Nothing here is secret, so no Secret is involved (see README).
+            - configMapRef:
+                name: devops-pipeline-demo-config
+          # Readiness gates traffic, and during a rollout it gates progress: a
+          # new pod that cannot answer /health is never added to the Service and
+          # never causes an old pod to be removed.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            # Nest boots in ~1s locally; 3s avoids probing a process that is
+            # still starting up.
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Liveness restarts a container that is wedged (event loop blocked,
+          # deadlock). It is deliberately slower than readiness: a restart is
+          # disruptive, and a temporary slow response is not proof of a hang.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Requests are what the scheduler reserves; limits are what the
+          # container may actually use. Real usage is a few tens of MB, so the
+          # 256Mi limit leaves plenty of headroom without letting a runaway
+          # process take the node down.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            # A Node app needs no privilege escalation and no Linux capabilities.
+            allowPrivilegeEscalation: false
+            # Nothing at runtime writes to the image filesystem, so making it
+            # read-only removes an easy persistence path for an attacker.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # With a read-only root filesystem, anything that expects a writable
+        # scratch directory gets this small in-memory volume instead of write
+        # access to /app. It is lost when the pod is replaced, which is fine.
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,16 @@
+# Non-secret runtime configuration for the API.
+#
+# Only PORT lives here today. Keeping it outside the image means the listen port
+# can be changed per environment without a rebuild or a new image tag. The app
+# reads process.env.PORT and falls back to 3000, so this ConfigMap must stay in
+# sync with containerPort in deployment.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-pipeline-demo-config
+  labels:
+    app: devops-pipeline-demo
+data:
+  # Quoted on purpose: ConfigMap values are strings, and an unquoted number
+  # would still work here but is a habit worth avoiding.
+  PORT: "3000"

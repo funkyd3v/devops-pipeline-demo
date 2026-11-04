@@ -1,0 +1,19 @@
+# kind cluster definition for the local Kubernetes stage.
+#
+# The cluster NAME is not part of this file: kind's Cluster schema has no "name"
+# field, so it is always passed on the command line:
+#
+#   kind create cluster --name devops-demo --config k8s/kind-config.yaml
+#
+# Why a single control-plane node: the demo needs a real Kubernetes API, not
+# capacity. One node keeps the container count (and the disk footprint on C:)
+# as small as possible while still being a complete, conformant cluster.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    # kind requires the node image to be pinned by digest, not just tag: tags on
+    # kindest/node are re-pushed when a patch release is rebuilt, so only the
+    # digest guarantees the exact Kubernetes build. This is the image published
+    # with kind v0.33.0 for Kubernetes 1.37.0.
+    image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
