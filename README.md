@@ -19,28 +19,6 @@ This project takes a small NestJS (TypeScript) REST API through a complete DevOp
 | Orchestration | Kubernetes (minikube/kind) |
 | Monitoring (optional) | Prometheus, Grafana |
 
-## Architecture
-
-```text
-Developer
-    |
-    v
-  GitHub
-    |
-    v
-  Jenkins  (build -> test -> build image -> push)
-    |
-    v
- Docker Hub
-    |
-    +----------------------+
-    |                      |
-    v                      v
-Ansible                Kubernetes
-(deploy to VM)         (deploy to cluster)
-```
-
-> Note: this diagram is a placeholder and will be replaced with a proper one later.
 
 ## Roadmap
 
