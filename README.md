@@ -50,8 +50,8 @@ Ansible                Kubernetes
 - [x] Ansible playbook (provision VM + deploy app)
 - [x] Kubernetes manifests (Deployment, Service, ConfigMap/Secret, probes)
 - [x] Rolling update and rollback demo
-- [ ] Monitoring with Prometheus and Grafana (optional)
-- [ ] Cloud deployment on AWS free tier (optional)
+- [ ] Monitoring with Prometheus and Grafana
+- [ ] Cloud deployment on AWS free tier
 
 ## Planned Project Structure
 
